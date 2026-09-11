@@ -9,20 +9,16 @@ from bot.views.submission_view import SubmissionView
 from config.database import SessionLocal
 
 
-# ============================================================
-# SUBMIT COMMAND GROUP
-# ============================================================
 
+#this is the group of our submit command 
 submit_group = app_commands.Group(
     name="submit",
     description="Submit employee work updates",
 )
 
 
-# ============================================================
-# /submit work
-# ============================================================
 
+#we are creating an /submit work in submit group
 @submit_group.command(
     name="work",
     description="Submit a work update",
@@ -40,19 +36,15 @@ async def submit_work(
     links: str | None = None,
     attachment: discord.Attachment | None = None,
 ):
-    # --------------------------------------------------------
-    # GET ATTACHMENT URL
-    # --------------------------------------------------------
 
+    #we are getting the attachment url to store in db and give response
     attachment_url = None
 
     if attachment is not None:
         attachment_url = attachment.url
 
-    # --------------------------------------------------------
-    # CREATE DATABASE SUBMISSION
-    # --------------------------------------------------------
 
+    #abhi database me stowre kr rhe h
     db = SessionLocal()
 
     try:
@@ -70,10 +62,7 @@ async def submit_work(
     finally:
         db.close()
 
-    # --------------------------------------------------------
-    # BUILD DISCORD EMBED
-    # --------------------------------------------------------
-
+ 
     embed = discord.Embed(
         title="📝 WORK UPDATE",
         color=discord.Color.orange(),
@@ -100,9 +89,6 @@ async def submit_work(
         inline=False,
     )
 
-    # --------------------------------------------------------
-    # OPTIONAL DESCRIPTION
-    # --------------------------------------------------------
 
     if description:
 
@@ -112,9 +98,6 @@ async def submit_work(
             inline=False,
         )
 
-    # --------------------------------------------------------
-    # OPTIONAL LINKS
-    # --------------------------------------------------------
 
     if links:
 
@@ -124,9 +107,7 @@ async def submit_work(
             inline=False,
         )
 
-    # --------------------------------------------------------
-    # OPTIONAL ATTACHMENT
-    # --------------------------------------------------------
+
 
     if attachment_url:
 
@@ -136,19 +117,12 @@ async def submit_work(
             inline=False,
         )
 
-    # --------------------------------------------------------
-    # INITIAL STATUS
-    # --------------------------------------------------------
 
     embed.add_field(
         name="Status",
         value="🟡 Pending Validation",
         inline=False,
     )
-
-    # --------------------------------------------------------
-    # SEND SUBMISSION TO SAME CHANNEL
-    # --------------------------------------------------------
 
     submission_message = await interaction.channel.send(
         embed=embed,
@@ -158,9 +132,6 @@ async def submit_work(
         ),
     )
 
-    # --------------------------------------------------------
-    # SAVE DISCORD MESSAGE ID
-    # --------------------------------------------------------
 
     db = SessionLocal()
 
@@ -175,10 +146,7 @@ async def submit_work(
     finally:
         db.close()
 
-    # --------------------------------------------------------
-    # CONFIRM TO EMPLOYEE
-    # --------------------------------------------------------
-
+ 
     await interaction.response.send_message(
         "✅ Work update submitted successfully.",
         ephemeral=True,

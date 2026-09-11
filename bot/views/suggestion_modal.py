@@ -27,9 +27,6 @@ class CommentModal(
         interaction: discord.Interaction,
     ):
 
-        # ----------------------------------------------------
-        # GET CHANNEL
-        # ----------------------------------------------------
 
         channel = interaction.channel
 
@@ -42,9 +39,6 @@ class CommentModal(
 
             return
 
-        # ----------------------------------------------------
-        # GET ORIGINAL SUBMISSION MESSAGE
-        # ----------------------------------------------------
 
         try:
 
@@ -70,9 +64,6 @@ class CommentModal(
 
             return
 
-        # ----------------------------------------------------
-        # ADD SUGGESTION AS REPLY
-        # ----------------------------------------------------
 
         try:
 
@@ -93,9 +84,6 @@ class CommentModal(
 
             return
 
-        # ----------------------------------------------------
-        # SUCCESS
-        # ----------------------------------------------------
 
         await interaction.response.send_message(
             "✅ Suggestion added.",

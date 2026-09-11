@@ -5,10 +5,8 @@ from bot.commands.submission import submit_group
 from config.settings import settings
 
 
-# ============================================================
-# BOT SETUP
-# ============================================================
 
+#yha we are setting the bot up
 intents = discord.Intents.default()
 
 bot = discord.Client(
@@ -18,26 +16,21 @@ bot = discord.Client(
 tree = app_commands.CommandTree(bot)
 
 
-# ============================================================
-# COMMAND REGISTRATION
-# ============================================================
 
+#apna /command register kr rhe h
 tree.add_command(
     submit_group
 )
 
 
-# ============================================================
-# BOT READY
-# ============================================================
-
+#jab discord ready  bol dega apne client ko t0w kya hoga
 @bot.event
 async def on_ready():
 
     print(
         f"Logged in as {bot.user}"
     )
-
+    #ye await se we are the /comands with discord
     await tree.sync()
 
     print(
@@ -45,10 +38,7 @@ async def on_ready():
     )
 
 
-# ============================================================
-# START BOT
-# ============================================================
-
+#start the bowwt
 bot.run(
     settings.discord_bot_token
 )

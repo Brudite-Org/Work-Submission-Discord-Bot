@@ -6,7 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
 
-
+#only impoort this when tools such as type checkers need it to avoid circular dependencies
 if TYPE_CHECKING:
     from models.submission_validation import SubmissionValidation
 
@@ -67,9 +67,6 @@ class Submission(Base):
 
 
 
-    # --------------------------------------------------
-    # Relationship to SubmissionValidation
-    # --------------------------------------------------
 
     validations: Mapped[list["SubmissionValidation"]] = relationship(
         back_populates="submission",

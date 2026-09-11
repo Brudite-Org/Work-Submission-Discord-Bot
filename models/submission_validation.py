@@ -49,17 +49,11 @@ class SubmissionValidation(Base):
         nullable=False,
     )
 
-    # --------------------------------------------------
-    # Relationship to Submission
-    # --------------------------------------------------
 
     submission: Mapped["Submission"] = relationship(
         back_populates="validations"
     )
 
-    # --------------------------------------------------
-    # Constraints
-    # --------------------------------------------------
 
     __table_args__ = (
         UniqueConstraint(
@@ -68,3 +62,4 @@ class SubmissionValidation(Base):
             name="uq_submission_validator",
         ),
     )
+

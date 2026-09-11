@@ -76,9 +76,6 @@ class ValidatorActionView(
         button: discord.ui.Button,
     ):
 
-        # ----------------------------------------------------
-        # SECURITY CHECK
-        # ----------------------------------------------------
 
         if interaction.user.id == self.submitter_id:
 
@@ -89,15 +86,9 @@ class ValidatorActionView(
 
             return
 
-        # ----------------------------------------------------
-        # IMPORT HERE TO AVOID CIRCULAR IMPORT
-        # ----------------------------------------------------
 
         from bot.views.validation_modal import ValidationModal
 
-        # ----------------------------------------------------
-        # OPEN VALIDATION MODAL
-        # ----------------------------------------------------
 
         await interaction.response.send_modal(
             ValidationModal(
@@ -133,18 +124,12 @@ class SubmissionView(
         button: discord.ui.Button,
     ):
 
-        # ----------------------------------------------------
-        # CHECK VALIDATOR ROLE
-        # ----------------------------------------------------
 
         validator_role = discord.utils.get(
             interaction.user.roles,
             name="Validator",
         )
 
-        # ----------------------------------------------------
-        # VALIDATOR
-        # ----------------------------------------------------
 
         if (
             validator_role is not None
@@ -162,9 +147,6 @@ class SubmissionView(
 
             return
 
-        # ----------------------------------------------------
-        # NORMAL EMPLOYEE
-        # ----------------------------------------------------
 
         await interaction.response.send_message(
             "Choose an action:",
