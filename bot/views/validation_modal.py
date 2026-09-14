@@ -2,7 +2,17 @@
 Discord modal for validating employee work submissions.
 """
 
-import discord
+import logging
+
+from discord import (
+    Forbidden,
+    HTTPException,
+    Interaction,
+    Member,
+    NotFound,
+    TextStyle,
+    ui,
+)
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.submission_service import (
@@ -17,16 +27,19 @@ from bot.views.submission_view import (
 from config.database import async_session_factory
 
 
+logger = logging.getLogger(__name__)
+
+
 class ValidationModal(
-    discord.ui.Modal,
+    ui.Modal,
     title="Validate Submission",
 ):
     """Provide a modal for validators to validate submissions."""
 
-    note = discord.ui.TextInput(
+    note = ui.TextInput(
         label="Validation note (optional)",
         placeholder="Add a note if you want...",
-        style=discord.TextStyle.paragraph,
+        style=TextStyle.paragraph,
         required=False,
         max_length=1000,
     )
@@ -43,14 +56,11 @@ class ValidationModal(
 
     async def on_submit(
         self,
-        interaction: discord.Interaction,
+        interaction: Interaction,
     ) -> None:
         """Validate the submission and update its Discord message."""
 
-        if not isinstance(
-            interaction.user,
-            discord.Member,
-        ):
+        if not isinstance(interaction.user, Member):
             await interaction.response.send_message(
                 "❌ Could not verify your server permissions.",
                 ephemeral=True,
@@ -89,23 +99,50 @@ class ValidationModal(
                 self.submission_message_id,
             )
 
-        except discord.NotFound:
+        except NotFound:
+            logger.warning(
+                "Submission message %s was not found.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ The original submission message could not be found.",
                 ephemeral=True,
             )
             return
 
-        except discord.Forbidden:
+        except Forbidden:
+            logger.exception(
+                "Permission denied while fetching submission message %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ I don't have permission to access the submission message.",
                 ephemeral=True,
             )
             return
 
-        except discord.HTTPException:
+        except HTTPException:
+            logger.exception(
+                "Discord HTTP error while fetching submission message %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ Discord could not retrieve the submission message.",
+                ephemeral=True,
+            )
+            return
+
+        except Exception:
+            logger.exception(
+                "Unexpected error while fetching submission message %s.",
+                self.submission_message_id,
+            )
+
+            await interaction.followup.send(
+                "❌ An unexpected error occurred. Please try again later.",
                 ephemeral=True,
             )
             return
@@ -132,6 +169,12 @@ class ValidationModal(
                 )
 
         except ValueError as error:
+            logger.warning(
+                "Validation rejected for submission %s: %s",
+                self.submission_message_id,
+                error,
+            )
+
             await interaction.followup.send(
                 f"❌ {error}",
                 ephemeral=True,
@@ -139,6 +182,11 @@ class ValidationModal(
             return
 
         except SQLAlchemyError:
+            logger.exception(
+                "Database error while validating submission %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ A database error occurred while validating "
                 "the submission. Please try again.",
@@ -146,7 +194,24 @@ class ValidationModal(
             )
             return
 
+        except Exception:
+            logger.exception(
+                "Unexpected error while validating submission %s.",
+                self.submission_message_id,
+            )
+
+            await interaction.followup.send(
+                "❌ An unexpected error occurred. Please try again later.",
+                ephemeral=True,
+            )
+            return
+
         if not submission_message.embeds:
+            logger.error(
+                "Submission message %s has no embed.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "⚠️ The submission was validated in the database, "
                 "but the Discord message has no embed to update.",
@@ -156,17 +221,15 @@ class ValidationModal(
 
         embed = submission_message.embeds[0].copy()
 
-        fields_to_keep = []
-
-        for field in embed.fields:
-            if field.name in (
+        fields_to_keep = [
+            field
+            for field in embed.fields
+            if field.name not in {
                 "Validated By",
                 "Validation Note",
                 "Validations",
-            ):
-                continue
-
-            fields_to_keep.append(field)
+            }
+        ]
 
         embed.clear_fields()
 
@@ -177,12 +240,14 @@ class ValidationModal(
                 inline=field.inline,
             )
 
-        status_index = None
-
-        for index, field in enumerate(embed.fields):
-            if field.name == "Status":
-                status_index = index
-                break
+        status_index = next(
+            (
+                index
+                for index, field in enumerate(embed.fields)
+                if field.name == "Status"
+            ),
+            None,
+        )
 
         if status_index is None:
             embed.add_field(
@@ -236,7 +301,12 @@ class ValidationModal(
                 view=SubmissionView(),
             )
 
-        except discord.NotFound:
+        except NotFound:
+            logger.warning(
+                "Submission message %s no longer exists.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "⚠️ The submission was validated, "
                 "but the Discord message no longer exists.",
@@ -244,7 +314,12 @@ class ValidationModal(
             )
             return
 
-        except discord.Forbidden:
+        except Forbidden:
+            logger.exception(
+                "Permission denied while updating submission message %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "⚠️ The submission was validated, "
                 "but I don't have permission to update the message.",
@@ -252,10 +327,28 @@ class ValidationModal(
             )
             return
 
-        except discord.HTTPException:
+        except HTTPException:
+            logger.exception(
+                "Discord HTTP error while updating submission message %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "⚠️ The submission was validated, "
                 "but Discord could not update the message.",
+                ephemeral=True,
+            )
+            return
+
+        except Exception:
+            logger.exception(
+                "Unexpected error while updating submission message %s.",
+                self.submission_message_id,
+            )
+
+            await interaction.followup.send(
+                "⚠️ The submission was validated, "
+                "but an unexpected error occurred while updating Discord.",
                 ephemeral=True,
             )
             return

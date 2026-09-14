@@ -38,7 +38,12 @@ async def create_submission(
     try:
         await db.commit()
         await db.refresh(submission)
+
     except SQLAlchemyError:
+        await db.rollback()
+        raise
+
+    except Exception:
         await db.rollback()
         raise
 
@@ -58,16 +63,19 @@ async def set_discord_message_id(
     )
 
     if submission is None:
-        raise ValueError(
-            "Submission not found"
-        )
+        raise ValueError("Submission not found")
 
     submission.discord_message_id = message_id
 
     try:
         await db.commit()
         await db.refresh(submission)
+
     except SQLAlchemyError:
+        await db.rollback()
+        raise
+
+    except Exception:
         await db.rollback()
         raise
 
@@ -80,18 +88,14 @@ async def get_submission_by_message_id(
 ) -> Submission:
     """Retrieve a submission using its Discord message ID."""
 
-    statement = select(
-        Submission
-    ).where(
-        Submission.discord_message_id == message_id
+    statement = select(Submission).where(
+        Submission.discord_message_id == message_id,
     )
 
     submission = await db.scalar(statement)
 
     if submission is None:
-        raise ValueError(
-            "Submission not found"
-        )
+        raise ValueError("Submission not found")
 
     return submission
 
@@ -100,14 +104,16 @@ async def get_submission_validations(
     db: AsyncSession,
     submission_id: int,
 ) -> list[SubmissionValidation]:
-    """Retrieve all validations for a submission in chronological order."""
+    """Retrieve all validations for a submission chronologically."""
 
-    statement = select(
-        SubmissionValidation
-    ).where(
-        SubmissionValidation.submission_id == submission_id
-    ).order_by(
-        SubmissionValidation.validated_at
+    statement = (
+        select(SubmissionValidation)
+        .where(
+            SubmissionValidation.submission_id == submission_id,
+        )
+        .order_by(
+            SubmissionValidation.validated_at,
+        )
     )
 
     result = await db.scalars(statement)
@@ -129,29 +135,23 @@ async def validate_submission(
     )
 
     if submission is None:
-        raise ValueError(
-            "Submission not found"
-        )
+        raise ValueError("Submission not found")
 
     if submission.employee_id == validator_id:
         raise ValueError(
-            "You cannot validate your own submission"
+            "You cannot validate your own submission",
         )
 
-    statement = select(
-        SubmissionValidation
-    ).where(
+    statement = select(SubmissionValidation).where(
         SubmissionValidation.submission_id == submission_id,
         SubmissionValidation.validator_id == validator_id,
     )
 
-    existing_validation = await db.scalar(
-        statement
-    )
+    existing_validation = await db.scalar(statement)
 
     if existing_validation is not None:
         raise ValueError(
-            "You have already validated this submission"
+            "You have already validated this submission",
         )
 
     validation = SubmissionValidation(
@@ -161,7 +161,6 @@ async def validate_submission(
     )
 
     db.add(validation)
-
     submission.is_validated = True
 
     try:
@@ -172,10 +171,14 @@ async def validate_submission(
         await db.rollback()
 
         raise ValueError(
-            "You have already validated this submission"
+            "You have already validated this submission",
         ) from error
 
     except SQLAlchemyError:
+        await db.rollback()
+        raise
+
+    except Exception:
         await db.rollback()
         raise
 

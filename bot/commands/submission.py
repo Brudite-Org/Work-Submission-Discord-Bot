@@ -2,8 +2,18 @@
 Discord command handlers for employee work submissions.
 """
 
-import discord
-from discord import app_commands
+import logging
+
+from discord import (
+    Attachment,
+    Color,
+    Embed,
+    Forbidden,
+    HTTPException,
+    Interaction,
+    app_commands,
+)
+from discord.utils import format_dt
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.submission_service import (
@@ -12,6 +22,9 @@ from app.services.submission_service import (
 )
 from bot.views.submission_view import SubmissionView
 from config.database import async_session_factory
+
+
+logger = logging.getLogger(__name__)
 
 
 submit_group = app_commands.Group(
@@ -31,11 +44,11 @@ submit_group = app_commands.Group(
     attachment="Optional file or image",
 )
 async def submit_work(
-    interaction: discord.Interaction,
+    interaction: Interaction,
     title: app_commands.Range[str, 1, 255],
     description: app_commands.Range[str, 1, 1024] | None = None,
     links: app_commands.Range[str, 1, 1024] | None = None,
-    attachment: discord.Attachment | None = None,
+    attachment: Attachment | None = None,
 ) -> None:
     """Create and publish an employee work submission."""
 
@@ -52,10 +65,7 @@ async def submit_work(
         )
         return
 
-    attachment_url = None
-
-    if attachment is not None:
-        attachment_url = attachment.url
+    attachment_url = attachment.url if attachment else None
 
     try:
         async with async_session_factory() as db:
@@ -70,6 +80,10 @@ async def submit_work(
             )
 
     except SQLAlchemyError:
+        logger.exception(
+            "Database error while creating submission.",
+        )
+
         await interaction.followup.send(
             "❌ A database error occurred while saving "
             "your submission. Please try again.",
@@ -77,9 +91,20 @@ async def submit_work(
         )
         return
 
-    embed = discord.Embed(
+    except Exception:
+        logger.exception(
+            "Unexpected error while creating submission.",
+        )
+
+        await interaction.followup.send(
+            "❌ An unexpected error occurred. Please try again later.",
+            ephemeral=True,
+        )
+        return
+
+    embed = Embed(
         title="📝 WORK UPDATE",
-        color=discord.Color.orange(),
+        color=Color.orange(),
     )
 
     embed.add_field(
@@ -96,7 +121,7 @@ async def submit_work(
 
     embed.add_field(
         name="🕐 Timestamp",
-        value=discord.utils.format_dt(
+        value=format_dt(
             submission.submitted_at,
             style="F",
         ),
@@ -136,7 +161,11 @@ async def submit_work(
             view=SubmissionView(),
         )
 
-    except discord.Forbidden:
+    except Forbidden:
+        logger.exception(
+            "Discord permission error while posting submission.",
+        )
+
         await interaction.followup.send(
             "❌ I don't have permission to post "
             "the submission in this channel.",
@@ -144,10 +173,25 @@ async def submit_work(
         )
         return
 
-    except discord.HTTPException:
+    except HTTPException:
+        logger.exception(
+            "Discord HTTP error while posting submission.",
+        )
+
         await interaction.followup.send(
             "❌ Discord could not post your submission. "
             "Please try again.",
+            ephemeral=True,
+        )
+        return
+
+    except Exception:
+        logger.exception(
+            "Unexpected error while posting submission to Discord.",
+        )
+
+        await interaction.followup.send(
+            "❌ An unexpected error occurred. Please try again later.",
             ephemeral=True,
         )
         return
@@ -161,15 +205,47 @@ async def submit_work(
             )
 
     except SQLAlchemyError:
+        logger.exception(
+            "Database error while saving Discord message ID.",
+        )
+
         try:
             await submission_message.delete()
-        except discord.HTTPException:
-            pass
+        except HTTPException:
+            logger.exception(
+                "Failed to delete Discord message after database error.",
+            )
+        except Exception:
+            logger.exception(
+                "Unexpected error while deleting Discord message.",
+            )
 
         await interaction.followup.send(
             "❌ The submission was posted to Discord, "
             "but it could not be saved correctly. "
             "Please try again.",
+            ephemeral=True,
+        )
+        return
+
+    except Exception:
+        logger.exception(
+            "Unexpected error while saving the Discord message ID.",
+        )
+
+        try:
+            await submission_message.delete()
+        except HTTPException:
+            logger.exception(
+                "Failed to delete Discord message after unexpected error.",
+            )
+        except Exception:
+            logger.exception(
+                "Unexpected error while deleting Discord message.",
+            )
+
+        await interaction.followup.send(
+            "❌ An unexpected error occurred. Please try again later.",
             ephemeral=True,
         )
         return

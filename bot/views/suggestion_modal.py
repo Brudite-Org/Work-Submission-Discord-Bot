@@ -2,16 +2,28 @@
 Discord modal for adding suggestions to employee work submissions.
 """
 
-import discord
+import logging
+
+from discord import (
+    Forbidden,
+    HTTPException,
+    Interaction,
+    NotFound,
+    TextStyle,
+    ui,
+)
 
 
-class CommentModal(discord.ui.Modal, title="Add Suggestion"):
+logger = logging.getLogger(__name__)
+
+
+class CommentModal(ui.Modal, title="Add Suggestion"):
     """Provide a modal for users to add suggestions to submissions."""
 
-    suggestion = discord.ui.TextInput(
+    suggestion = ui.TextInput(
         label="Suggestion",
         placeholder="Write your suggestion...",
-        style=discord.TextStyle.paragraph,
+        style=TextStyle.paragraph,
         required=True,
         max_length=1000,
     )
@@ -26,7 +38,7 @@ class CommentModal(discord.ui.Modal, title="Add Suggestion"):
 
     async def on_submit(
         self,
-        interaction: discord.Interaction,
+        interaction: Interaction,
     ) -> None:
         """Add the submitted suggestion as a reply to the submission."""
 
@@ -47,21 +59,51 @@ class CommentModal(discord.ui.Modal, title="Add Suggestion"):
             submission_message = await channel.fetch_message(
                 self.submission_message_id,
             )
-        except discord.NotFound:
+
+        except NotFound:
+            logger.warning(
+                "Submission message %s was not found.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ The original submission message could not be found.",
                 ephemeral=True,
             )
             return
-        except discord.Forbidden:
+
+        except Forbidden:
+            logger.exception(
+                "Permission denied while fetching submission message %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ I don't have permission to access the submission message.",
                 ephemeral=True,
             )
             return
-        except discord.HTTPException:
+
+        except HTTPException:
+            logger.exception(
+                "Discord HTTP error while fetching submission message %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ Discord could not retrieve the submission message.",
+                ephemeral=True,
+            )
+            return
+
+        except Exception:
+            logger.exception(
+                "Unexpected error while fetching submission message %s.",
+                self.submission_message_id,
+            )
+
+            await interaction.followup.send(
+                "❌ An unexpected error occurred. Please try again later.",
                 ephemeral=True,
             )
             return
@@ -74,22 +116,50 @@ class CommentModal(discord.ui.Modal, title="Add Suggestion"):
                     f"{self.suggestion.value}"
                 ),
             )
-        except discord.NotFound:
+
+        except NotFound:
+            logger.warning(
+                "Submission message %s disappeared before replying.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ The original submission message could not be found.",
                 ephemeral=True,
             )
             return
-        except discord.Forbidden:
+
+        except Forbidden:
+            logger.exception(
+                "Permission denied while replying to submission message %s.",
+                self.submission_message_id,
+            )
+
             await interaction.followup.send(
                 "❌ I don't have permission to reply to the submission.",
                 ephemeral=True,
             )
             return
-        except discord.HTTPException:
+
+        except HTTPException:
+            logger.exception(
+                "Discord HTTP error while adding suggestion.",
+            )
+
             await interaction.followup.send(
                 "❌ Discord could not add your suggestion. "
                 "Please try again.",
+                ephemeral=True,
+            )
+            return
+
+        except Exception:
+            logger.exception(
+                "Unexpected error while adding suggestion.",
+            )
+
+            await interaction.followup.send(
+                "❌ An unexpected error occurred. Please try again later.",
                 ephemeral=True,
             )
             return
