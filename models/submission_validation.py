@@ -1,3 +1,7 @@
+"""
+SQLAlchemy model representing a validator's validation of a submission.
+"""
+
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -22,10 +26,12 @@ if TYPE_CHECKING:
 
 
 class SubmissionValidation(Base):
+    """Represent one validator's validation of an employee submission."""
+
     __tablename__ = "submission_validations"
 
     id: Mapped[int] = mapped_column(
-        primary_key=True
+        primary_key=True,
     )
 
     submission_id: Mapped[int] = mapped_column(
@@ -49,11 +55,9 @@ class SubmissionValidation(Base):
         nullable=False,
     )
 
-
     submission: Mapped["Submission"] = relationship(
-        back_populates="validations"
+        back_populates="validations",
     )
-
 
     __table_args__ = (
         UniqueConstraint(
@@ -62,4 +66,3 @@ class SubmissionValidation(Base):
             name="uq_submission_validator",
         ),
     )
-

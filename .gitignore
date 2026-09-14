@@ -1,5 +1,30 @@
+# Virtual environment
 .venv/
+
+# Environment variables
 .env
+
+# Python cache
 __pycache__/
-*.pyc
+*.py[cod]
+
+# Python distribution/build files
+build/
+dist/
+*.egg-info/
+
+# Test and coverage files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checker cache
+.mypy_cache/
+.pyright/
+
+# IDE/editor files
+.vscode/
+.idea/
+
+# Local project files
 note.txt
