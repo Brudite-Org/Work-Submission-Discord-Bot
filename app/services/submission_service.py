@@ -1,12 +1,20 @@
+"""
+Database operations for employee work submissions.
+"""
+
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.exc import (
+    IntegrityError,
+    SQLAlchemyError,
+)
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.submission import Submission
 from models.submission_validation import SubmissionValidation
 
 
-def create_submission(
-    db: Session,
+async def create_submission(
+    db: AsyncSession,
     title: str,
     description: str | None,
     links: str | None,
@@ -14,6 +22,8 @@ def create_submission(
     employee_id: int,
     channel_id: int,
 ) -> Submission:
+    """Create and persist a new employee work submission."""
+
     submission = Submission(
         title=title,
         description=description,
@@ -24,18 +34,25 @@ def create_submission(
     )
 
     db.add(submission)
-    db.commit()
-    db.refresh(submission)
+
+    try:
+        await db.commit()
+        await db.refresh(submission)
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
 
     return submission
 
 
-def set_discord_message_id(
-    db: Session,
+async def set_discord_message_id(
+    db: AsyncSession,
     submission_id: int,
     message_id: int,
 ) -> Submission:
-    submission = db.get(
+    """Associate a Discord message with an existing submission."""
+
+    submission = await db.get(
         Submission,
         submission_id,
     )
@@ -47,21 +64,29 @@ def set_discord_message_id(
 
     submission.discord_message_id = message_id
 
-    db.commit()
-    db.refresh(submission)
+    try:
+        await db.commit()
+        await db.refresh(submission)
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
 
     return submission
 
 
-def get_submission_by_message_id(
-    db: Session,
+async def get_submission_by_message_id(
+    db: AsyncSession,
     message_id: int,
 ) -> Submission:
-    statement = select(Submission).where(
+    """Retrieve a submission using its Discord message ID."""
+
+    statement = select(
+        Submission
+    ).where(
         Submission.discord_message_id == message_id
     )
 
-    submission = db.scalar(statement)
+    submission = await db.scalar(statement)
 
     if submission is None:
         raise ValueError(
@@ -71,30 +96,34 @@ def get_submission_by_message_id(
     return submission
 
 
-def get_submission_validations(
-    db: Session,
+async def get_submission_validations(
+    db: AsyncSession,
     submission_id: int,
 ) -> list[SubmissionValidation]:
-    submission = db.get(
-        Submission,
-        submission_id,
+    """Retrieve all validations for a submission in chronological order."""
+
+    statement = select(
+        SubmissionValidation
+    ).where(
+        SubmissionValidation.submission_id == submission_id
+    ).order_by(
+        SubmissionValidation.validated_at
     )
 
-    if submission is None:
-        raise ValueError(
-            "Submission not found"
-        )
+    result = await db.scalars(statement)
 
-    return submission.validations
+    return list(result)
 
 
-def validate_submission(
-    db: Session,
+async def validate_submission(
+    db: AsyncSession,
     submission_id: int,
     validator_id: int,
     validation_note: str | None,
 ) -> Submission:
-    submission = db.get(
+    """Validate a submission on behalf of an eligible validator."""
+
+    submission = await db.get(
         Submission,
         submission_id,
     )
@@ -116,7 +145,7 @@ def validate_submission(
         SubmissionValidation.validator_id == validator_id,
     )
 
-    existing_validation = db.scalar(
+    existing_validation = await db.scalar(
         statement
     )
 
@@ -135,7 +164,19 @@ def validate_submission(
 
     submission.is_validated = True
 
-    db.commit()
-    db.refresh(submission)
+    try:
+        await db.commit()
+        await db.refresh(submission)
+
+    except IntegrityError as error:
+        await db.rollback()
+
+        raise ValueError(
+            "You have already validated this submission"
+        ) from error
+
+    except SQLAlchemyError:
+        await db.rollback()
+        raise
 
     return submission

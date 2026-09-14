@@ -1,32 +1,30 @@
+"""
+Alembic migration environment configuration.
+"""
+
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 from config.settings import settings
-
 from models.base import Base
-from models.submission import Submission
-from models.submission_validation import SubmissionValidation
+from models.submission import Submission  # noqa: F401
+from models.submission_validation import SubmissionValidation  # noqa: F401
 
 
-# Alembic Config object
 config = context.config
 
 
-# Configure Python logging
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 
-# SQLAlchemy metadata
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """Run migrations in 'offline' mode."""
+    """Run migrations in offline mode."""
 
     url = settings.database_url
 
@@ -35,7 +33,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={
-            "paramstyle": "named"
+            "paramstyle": "named",
         },
     )
 
@@ -44,7 +42,7 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
+    """Run migrations in online mode."""
 
     configuration = config.get_section(
         config.config_ini_section,
@@ -60,7 +58,6 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-
         context.configure(
             connection=connection,
             target_metadata=target_metadata,

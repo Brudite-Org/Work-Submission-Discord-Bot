@@ -1,3 +1,7 @@
+"""
+SQLAlchemy model representing an employee work submission.
+"""
+
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -6,16 +10,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from models.base import Base
 
-#only impoort this when tools such as type checkers need it to avoid circular dependencies
+
+# Import only during type checking to avoid circular dependencies.
 if TYPE_CHECKING:
     from models.submission_validation import SubmissionValidation
 
 
 class Submission(Base):
+    """Represent an employee's submitted work update."""
+
     __tablename__ = "submissions"
 
     id: Mapped[int] = mapped_column(
-        primary_key=True
+        primary_key=True,
     )
 
     title: Mapped[str] = mapped_column(
@@ -65,9 +72,7 @@ class Submission(Base):
         nullable=False,
     )
 
-
-
-
     validations: Mapped[list["SubmissionValidation"]] = relationship(
         back_populates="submission",
+        lazy="selectin",
     )
