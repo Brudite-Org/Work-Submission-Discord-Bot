@@ -1,15 +1,16 @@
 """
-Application entry point for the Discord bot.
+Application entry point for the Discord employee updates bot.
 
 This module initializes the Discord client, registers application
-commands, synchronizes commands with Discord, and starts the bot.
+commands and persistent views, handles command errors, and starts
+the bot.
 """
 
 import asyncio
 import logging
 
-import discord
-from discord import app_commands
+from discord import Client, Interaction, Intents, app_commands
+from discord.errors import HTTPException
 
 from bot.commands.submission import submit_group
 from bot.views.submission_view import SubmissionView
@@ -24,28 +25,22 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class EmployeeUpdatesBot(discord.Client):
-    """Discord client for the employee updates bot."""
+class EmployeeUpdatesBot(Client):
+    """Discord client for the employee updates application."""
 
     def __init__(self) -> None:
-        """Initialize the Discord client and command tree."""
-
-        intents = discord.Intents.default()
+        """Initialize the Discord client and application command tree."""
 
         super().__init__(
-            intents=intents,
+            intents=Intents.default(),
         )
 
-        self.tree = app_commands.CommandTree(
-            self,
-        )
+        self.tree = app_commands.CommandTree(self)
 
     async def setup_hook(self) -> None:
-        """Register commands and persistent Discord views."""
+        """Register commands and persistent views, then sync commands."""
 
-        self.tree.add_command(
-            submit_group,
-        )
+        self.tree.add_command(submit_group)
 
         self.add_view(
             SubmissionView(),
@@ -54,7 +49,7 @@ class EmployeeUpdatesBot(discord.Client):
         await self.tree.sync()
 
         logger.info(
-            "Slash commands synced.",
+            "Slash commands synced successfully.",
         )
 
 
@@ -63,45 +58,58 @@ bot = EmployeeUpdatesBot()
 
 @bot.event
 async def on_ready() -> None:
-    """Handle the bot becoming ready after connecting to Discord."""
+    """Log when the bot successfully connects to Discord."""
 
     logger.info(
-        "Logged in as %s",
+        "Logged in as %s.",
         bot.user,
     )
 
 
 @bot.tree.error
 async def on_app_command_error(
-    interaction: discord.Interaction,
+    interaction: Interaction,
     error: app_commands.AppCommandError,
 ) -> None:
-    """Handle unexpected errors raised by application commands."""
+    """Handle unhandled application-command errors."""
 
     logger.error(
-        "Application command error",
-        exc_info=error,
+        "Unhandled application command error: %s",
+        error,
+        exc_info=(type(error), error, error.__traceback__),
     )
 
-    message = (
+    error_message = (
         "❌ Something went wrong while processing your command. "
-        "Please try again."
+        "Please try again later."
     )
 
-    if interaction.response.is_done():
-        await interaction.followup.send(
-            message,
-            ephemeral=True,
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(
+                error_message,
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                error_message,
+                ephemeral=True,
+            )
+
+    except HTTPException:
+        logger.exception(
+            "Failed to send the application-command error response.",
         )
-    else:
-        await interaction.response.send_message(
-            message,
-            ephemeral=True,
+
+    except Exception:
+        logger.exception(
+            "Unexpected error while sending the application-command "
+            "error response.",
         )
 
 
 async def main() -> None:
-    """Start the Discord bot."""
+    """Start and manage the Discord bot lifecycle."""
 
     async with bot:
         await bot.start(
@@ -110,6 +118,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    # Psycopg async mode requires a selector-based event loop on Windows.
     asyncio.run(
         main(),
         loop_factory=asyncio.SelectorEventLoop,

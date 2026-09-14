@@ -2,7 +2,16 @@
 Discord views for interacting with employee work submissions.
 """
 
-import discord
+import logging
+from typing import TYPE_CHECKING
+
+from discord import (
+    ButtonStyle,
+    Button,
+    Interaction,
+    Member,
+    ui,
+)
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.submission_service import (
@@ -13,9 +22,14 @@ from config.database import async_session_factory
 from config.settings import settings
 
 
-def has_validator_role(
-    member: discord.Member,
-) -> bool:
+if TYPE_CHECKING:
+    from bot.views.validation_modal import ValidationModal
+
+
+logger = logging.getLogger(__name__)
+
+
+def has_validator_role(member: Member) -> bool:
     """Return whether a member has the configured validator role."""
 
     return any(
@@ -24,7 +38,7 @@ def has_validator_role(
     )
 
 
-class ActionView(discord.ui.View):
+class ActionView(ui.View):
     """Provide actions available for the interacting user."""
 
     def __init__(
@@ -48,14 +62,14 @@ class ActionView(discord.ui.View):
                 )
             )
 
-    @discord.ui.button(
+    @ui.button(
         label="💡 Add Suggestion",
-        style=discord.ButtonStyle.secondary,
+        style=ButtonStyle.secondary,
     )
     async def suggestion_button(
         self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
+        interaction: Interaction,
+        button: Button,
     ) -> None:
         """Open the suggestion modal."""
 
@@ -66,7 +80,7 @@ class ActionView(discord.ui.View):
         )
 
 
-class ValidateButton(discord.ui.Button):
+class ValidateButton(Button):
     """Provide the validation action to eligible validators."""
 
     def __init__(
@@ -76,7 +90,7 @@ class ValidateButton(discord.ui.Button):
     ) -> None:
         super().__init__(
             label="✅ Validate Submission",
-            style=discord.ButtonStyle.success,
+            style=ButtonStyle.success,
         )
 
         self.submitter_id = submitter_id
@@ -84,14 +98,11 @@ class ValidateButton(discord.ui.Button):
 
     async def callback(
         self,
-        interaction: discord.Interaction,
+        interaction: Interaction,
     ) -> None:
         """Open the validation modal for an eligible validator."""
 
-        if not isinstance(
-            interaction.user,
-            discord.Member,
-        ):
+        if not isinstance(interaction.user, Member):
             await interaction.response.send_message(
                 "❌ Could not verify your server permissions.",
                 ephemeral=True,
@@ -122,7 +133,7 @@ class ValidateButton(discord.ui.Button):
         )
 
 
-class SubmissionView(discord.ui.View):
+class SubmissionView(ui.View):
     """Provide the persistent public action button for a submission."""
 
     def __init__(self) -> None:
@@ -130,22 +141,19 @@ class SubmissionView(discord.ui.View):
             timeout=None,
         )
 
-    @discord.ui.button(
+    @ui.button(
         label="⚙️ Open Actions",
-        style=discord.ButtonStyle.secondary,
+        style=ButtonStyle.secondary,
         custom_id="submission:open_actions",
     )
     async def open_actions(
         self,
-        interaction: discord.Interaction,
-        button: discord.ui.Button,
+        interaction: Interaction,
+        button: Button,
     ) -> None:
         """Open an action panel appropriate for the interacting user."""
 
-        if not isinstance(
-            interaction.user,
-            discord.Member,
-        ):
+        if not isinstance(interaction.user, Member):
             await interaction.response.send_message(
                 "❌ Could not verify your server permissions.",
                 ephemeral=True,
@@ -164,6 +172,11 @@ class SubmissionView(discord.ui.View):
                 )
 
         except ValueError:
+            logger.warning(
+                "Submission not found for Discord message ID %s.",
+                interaction.message.id,
+            )
+
             await interaction.followup.send(
                 "❌ This submission could not be found.",
                 ephemeral=True,
@@ -171,9 +184,24 @@ class SubmissionView(discord.ui.View):
             return
 
         except SQLAlchemyError:
+            logger.exception(
+                "Database error while opening submission actions.",
+            )
+
             await interaction.followup.send(
                 "❌ A database error occurred while opening "
                 "the submission actions.",
+                ephemeral=True,
+            )
+            return
+
+        except Exception:
+            logger.exception(
+                "Unexpected error while opening submission actions.",
+            )
+
+            await interaction.followup.send(
+                "❌ An unexpected error occurred. Please try again later.",
                 ephemeral=True,
             )
             return
