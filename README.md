@@ -2,7 +2,7 @@
 
 A Discord-based employee work update and validation system.
 
-Employees can submit their work updates directly through Discord. Submissions are stored in PostgreSQL and displayed in the Discord channel where they were submitted.
+Employees can submit their work updates directly through Discord. Submissions are stored in PostgreSQL and displayed as Discord embeds in the designated submission channel.
 
 Validators can review submissions, add suggestions, and independently validate them.
 
@@ -11,6 +11,8 @@ Validators can review submissions, add suggestions, and independently validate t
 ## Features
 
 - Submit employee work updates through `/submit work`
+- Restrict the bot to one designated Discord server
+- Restrict submissions to one designated Discord channel
 - Optional description, links, and attachment
 - Store submissions in PostgreSQL
 - Display submissions as Discord embeds
@@ -95,6 +97,7 @@ discord_server/
 │   └── script.py.mako
 │
 ├── .env
+├── .env.example
 ├── .gitignore
 ├── alembic.ini
 ├── requirements.txt
@@ -105,7 +108,7 @@ discord_server/
 
 # Local Setup
 
-## 1. Clone the repository
+## 1. Clone the Repository
 
 ```bash
 git clone https://github.com/karanyogix/Discord.git
@@ -114,21 +117,21 @@ cd Discord
 
 ---
 
-## 2. Create a virtual environment
+## 2. Create a Virtual Environment
 
-Windows:
+### Windows PowerShell
 
 ```powershell
 python -m venv .venv
 ```
 
-Activate it:
+Activate the virtual environment:
 
 ```powershell
 .venv\Scripts\Activate.ps1
 ```
 
-If you are using Command Prompt instead:
+### Windows Command Prompt
 
 ```cmd
 .venv\Scripts\activate
@@ -136,7 +139,7 @@ If you are using Command Prompt instead:
 
 ---
 
-## 3. Install dependencies
+## 3. Install Dependencies
 
 ```powershell
 pip install -r requirements.txt
@@ -160,7 +163,13 @@ The default PostgreSQL port is:
 5432
 ```
 
-You will need a PostgreSQL username and password.
+You will need:
+
+- PostgreSQL username
+- PostgreSQL password
+- PostgreSQL database name
+- PostgreSQL host
+- PostgreSQL port
 
 ---
 
@@ -170,43 +179,83 @@ Create a `.env` file in the project root:
 
 ```text
 discord_server/
+│
 ├── .env
 ├── bot/
 ├── app/
 └── ...
 ```
 
-Add:
+Add the following configuration:
 
 ```env
+# Discord configuration
 DISCORD_BOT_TOKEN=your_discord_bot_token
+
+# Database configuration
 DATABASE_URL=postgresql+psycopg://postgres:password@localhost:5432/employee_updated
+
+# Validator role configuration
+VALIDATOR_ROLE_ID=123456789012345678
+
+# Company Discord server and submission channel
+TARGET_GUILD_ID=123456789012345678
+SUBMISSION_CHANNEL_ID=987654321098765432
 ```
 
-Replace the values with your own credentials.
+Replace the placeholder values with your actual configuration.
+
+### Environment Variable Descriptions
+
+| Variable | Description |
+|---|---|
+| `DISCORD_BOT_TOKEN` | Token for the Discord bot |
+| `DATABASE_URL` | PostgreSQL connection URL |
+| `VALIDATOR_ROLE_ID` | Discord role ID for validators |
+| `TARGET_GUILD_ID` | ID of the company Discord server |
+| `SUBMISSION_CHANNEL_ID` | ID of the designated work submission channel |
+
+### How to Get Discord IDs
+
+Enable Developer Mode in Discord:
+
+1. Open Discord User Settings.
+2. Go to **Advanced**.
+3. Enable **Developer Mode**.
+
+Then:
+
+- Right-click the company server and select **Copy Server ID**.
+- Right-click the submission channel and select **Copy Channel ID**.
 
 ### Important
 
 Never commit `.env` to Git.
 
-The repository's `.gitignore` already excludes it.
+The repository's `.gitignore` should exclude it.
+
+You can use `.env.example` as a template without including real secrets.
 
 If your PostgreSQL password contains special characters such as `@`, URL-encode the character.
 
 For example:
 
 ```text
-password:
+Original password:
 my@password
 ```
 
-becomes:
+Becomes:
 
 ```text
 my%40password
 ```
 
-inside the database URL.
+Inside the database URL:
+
+```env
+DATABASE_URL=postgresql+psycopg://postgres:my%40password@localhost:5432/employee_updated
+```
 
 ---
 
@@ -214,14 +263,14 @@ inside the database URL.
 
 Create a Discord application and bot through the Discord Developer Portal.
 
-The bot needs to be invited to your Discord server with the required permissions for:
+The bot must be invited to the company Discord server with the required permissions:
 
-- Sending messages
-- Reading message history
-- Embedding links
-- Using slash commands
-- Sending attachments
-- Managing interactions
+- View Channels
+- Send Messages
+- Read Message History
+- Embed Links
+- Attach Files
+- Use Application Commands
 
 The bot also uses a Discord role named:
 
@@ -230,6 +279,26 @@ Validator
 ```
 
 Members with this role can validate other employees' submissions.
+
+## Server and Channel Restrictions
+
+The bot is configured to work with:
+
+1. One specific Discord server.
+2. One specific submission channel inside that server.
+
+The `/submit work` command is rejected when it is used:
+
+- In a direct message.
+- In another Discord server.
+- In a channel other than the configured submission channel.
+
+These restrictions are controlled by:
+
+```env
+TARGET_GUILD_ID=your_company_server_id
+SUBMISSION_CHANNEL_ID=your_submission_channel_id
+```
 
 ---
 
@@ -261,9 +330,9 @@ After changing a SQLAlchemy model:
 alembic revision --autogenerate -m "describe your change"
 ```
 
-Then review the generated migration before applying it.
+Review the generated migration before applying it.
 
-Apply it with:
+Apply the migration:
 
 ```powershell
 alembic upgrade head
@@ -285,7 +354,7 @@ From the project root:
 python -m bot.main
 ```
 
-You should see something similar to:
+You should see output similar to:
 
 ```text
 Logged in as YourBot
@@ -311,7 +380,9 @@ The command accepts:
 - `links` — optional
 - `attachment` — optional
 
-The submission is posted in the same Discord channel where the command was used.
+The command must be used in the configured submission channel.
+
+The submission is posted in the same channel where the command was used.
 
 ---
 
@@ -323,6 +394,10 @@ Employee
    │ /submit work
    ▼
 Discord Bot
+   │
+   ├── Check server ID
+   │
+   ├── Check channel ID
    │
    ├── Save submission
    │
@@ -416,7 +491,7 @@ The main database tables are:
 ```text
 submissions
     │
-    │  one-to-many
+    │ one-to-many
     ▼
 submission_validations
 ```
@@ -454,7 +529,7 @@ A unique constraint prevents the same validator from validating the same submiss
 
 # Security
 
-The bot performs permission checks in the application logic.
+The bot performs permission and ownership checks in the application logic.
 
 For example:
 
@@ -462,8 +537,13 @@ For example:
 - Employees cannot validate their own submissions.
 - A validator cannot validate the same submission twice.
 - Suggestions are associated with the original submission.
+- Users can only edit or delete their own suggestions.
+- The bot checks the configured Discord server ID.
+- The bot checks the configured submission channel ID.
 
-UI restrictions are not treated as the only security mechanism. Validation is also checked when the action is actually processed.
+UI restrictions are not treated as the only security mechanism.
+
+Validation and ownership rules are also checked when the action is actually processed.
 
 ---
 
@@ -505,6 +585,17 @@ git push
 # Current Version
 
 The current version provides the initial employee work submission and validation workflow through Discord.
+
+It includes:
+
+- Employee work submissions
+- PostgreSQL persistence
+- Discord embed messages
+- Suggestions
+- Role-based validation
+- Multiple validators
+- Validation history
+- Server and channel restrictions
 
 Future versions can extend the system with features such as:
 

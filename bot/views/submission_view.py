@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 
 from discord import (
     ButtonStyle,
-    Button,
     Interaction,
     Member,
     ui,
@@ -69,7 +68,7 @@ class ActionView(ui.View):
     async def suggestion_button(
         self,
         interaction: Interaction,
-        button: Button,
+        button: ui.Button,
     ) -> None:
         """Open the suggestion modal."""
 
@@ -80,7 +79,7 @@ class ActionView(ui.View):
         )
 
 
-class ValidateButton(Button):
+class ValidateButton(ui.Button):
     """Provide the validation action to eligible validators."""
 
     def __init__(
@@ -149,7 +148,7 @@ class SubmissionView(ui.View):
     async def open_actions(
         self,
         interaction: Interaction,
-        button: Button,
+        button: ui.Button,
     ) -> None:
         """Open an action panel appropriate for the interacting user."""
 

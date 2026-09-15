@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     database_url: str
     validator_role_id: int
 
+    target_guild_id: int
+    submission_channel_id: int
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
