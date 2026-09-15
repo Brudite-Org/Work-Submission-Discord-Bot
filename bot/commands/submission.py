@@ -5,6 +5,7 @@ Discord command handlers for employee work submissions.
 import logging
 
 from discord import (
+    AllowedMentions,
     Attachment,
     Color,
     Embed,
@@ -13,7 +14,7 @@ from discord import (
     Interaction,
     app_commands,
 )
-from discord.utils import format_dt
+from discord.utils import escape_mentions, format_dt
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.services.submission_service import (
@@ -22,6 +23,7 @@ from app.services.submission_service import (
 )
 from bot.views.submission_view import SubmissionView
 from config.database import async_session_factory
+from config.settings import settings
 
 
 logger = logging.getLogger(__name__)
@@ -52,6 +54,20 @@ async def submit_work(
 ) -> None:
     """Create and publish an employee work submission."""
 
+    if interaction.guild_id != settings.target_guild_id:
+        await interaction.response.send_message(
+            "❌ This bot can only be used in the designated company server.",
+            ephemeral=True,
+        )
+        return
+
+    if interaction.channel_id != settings.submission_channel_id:
+        await interaction.response.send_message(
+            "❌ Please use the designated submission channel.",
+            ephemeral=True,
+        )
+        return
+
     await interaction.response.defer(
         ephemeral=True,
     )
@@ -65,7 +81,12 @@ async def submit_work(
         )
         return
 
-    attachment_url = attachment.url if attachment else None
+    escaped_title = escape_mentions(title)
+    escaped_description = escape_mentions(description or "")
+    escaped_links = escape_mentions(links or "")
+    escaped_attachment_url = escape_mentions(
+        attachment.url if attachment else "",
+    )
 
     try:
         async with async_session_factory() as db:
@@ -74,7 +95,7 @@ async def submit_work(
                 title=title,
                 description=description,
                 links=links,
-                attachment_url=attachment_url,
+                attachment_url=attachment.url if attachment else None,
                 employee_id=interaction.user.id,
                 channel_id=channel.id,
             )
@@ -109,7 +130,7 @@ async def submit_work(
 
     embed.add_field(
         name="Title",
-        value=title,
+        value=escaped_title,
         inline=False,
     )
 
@@ -128,24 +149,24 @@ async def submit_work(
         inline=False,
     )
 
-    if description:
+    if escaped_description:
         embed.add_field(
             name="📋 Description",
-            value=description,
+            value=escaped_description,
             inline=False,
         )
 
-    if links:
+    if escaped_links:
         embed.add_field(
             name="🔗 Links",
-            value=links,
+            value=escaped_links,
             inline=False,
         )
 
-    if attachment_url:
+    if escaped_attachment_url:
         embed.add_field(
             name="📎 Attachment",
-            value=attachment_url,
+            value=escaped_attachment_url,
             inline=False,
         )
 
@@ -159,6 +180,7 @@ async def submit_work(
         submission_message = await channel.send(
             embed=embed,
             view=SubmissionView(),
+            allowed_mentions=AllowedMentions.none(),
         )
 
     except Forbidden:

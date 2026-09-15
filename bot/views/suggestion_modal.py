@@ -5,6 +5,7 @@ Discord modal for adding suggestions to employee work submissions.
 import logging
 
 from discord import (
+    AllowedMentions,
     Forbidden,
     HTTPException,
     Interaction,
@@ -12,6 +13,7 @@ from discord import (
     TextStyle,
     ui,
 )
+from discord.utils import escape_mentions
 
 
 logger = logging.getLogger(__name__)
@@ -108,13 +110,18 @@ class CommentModal(ui.Modal, title="Add Suggestion"):
             )
             return
 
+        suggestion_text = escape_mentions(
+            self.suggestion.value,
+        )
+
         try:
             await submission_message.reply(
                 content=(
                     f"💡 **Suggestion from "
                     f"{interaction.user.mention}**\n\n"
-                    f"{self.suggestion.value}"
+                    f"{suggestion_text}"
                 ),
+                allowed_mentions=AllowedMentions.none(),
             )
 
         except NotFound:
